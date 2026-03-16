@@ -1,0 +1,170 @@
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/mongodb';
+import { auth } from '@/auth';
+import Replacement, { ReplacementStatus } from '@/models/Replacement';
+import Tool from '@/models/Tool';
+import { mkdir, writeFile } from 'fs/promises';
+import path from 'path';
+import { readFormData } from '@/lib/formData';
+
+export const runtime = 'nodejs';
+
+function isReplacementStatus(value: string): value is ReplacementStatus {
+  return (
+    value === 'Requested' ||
+    value === 'Approved' ||
+    value === 'Shipped' ||
+    value === 'ReplacementReceived' ||
+    value === 'OldToolInTransit' ||
+    value === 'OldReturned' ||
+    value === 'Verified' ||
+    value === 'Completed' ||
+    value === 'Rejected'
+  );
+}
+
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session || session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  await dbConnect();
+
+  try {
+    const replacement = await Replacement.findById(id);
+    if (!replacement) return NextResponse.json({ error: 'Replacement not found' }, { status: 404 });
+
+    const contentType = req.headers.get('content-type') || '';
+    const now = new Date();
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await readFormData(req);
+      const statusRaw = formData.get('status');
+      const returnConditionRaw = formData.get('returnCondition');
+      const returnDescriptionRaw = formData.get('returnDescription');
+      const noteRaw = formData.get('note');
+      const file = formData.get('returnPhoto') as File | null;
+
+      if (typeof statusRaw !== 'string' || !isReplacementStatus(statusRaw)) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+      }
+
+      replacement.status = statusRaw;
+      replacement.note = typeof noteRaw === 'string' ? noteRaw : replacement.note;
+
+      if (statusRaw === 'OldReturned') {
+        if (typeof returnConditionRaw !== 'string' || (returnConditionRaw !== 'Good' && returnConditionRaw !== 'Bad')) {
+          return NextResponse.json({ error: 'Invalid returnCondition' }, { status: 400 });
+        }
+        replacement.returnCondition = returnConditionRaw;
+        replacement.returnDescription = typeof returnDescriptionRaw === 'string' ? returnDescriptionRaw : '';
+
+        if (file && file.size > 0 && file.name !== 'undefined') {
+          const bytes = await file.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          const filename = `replacement-return-${Date.now()}-${file.name.replace(/\\s/g, '_')}`;
+          const uploadDir = path.join(process.cwd(), 'public/uploads');
+          await mkdir(uploadDir, { recursive: true });
+          await writeFile(path.join(uploadDir, filename), buffer);
+          replacement.returnPhotoUrl = `/uploads/${filename}`;
+        }
+
+        replacement.oldReturnedAt = now;
+
+        await Tool.findByIdAndUpdate(replacement.oldToolId, {
+          $set: {
+            isBorrowed: false,
+            currentBorrowerId: null,
+            currentBorrowerName: null,
+            currentLoanId: null,
+            condition: replacement.returnCondition,
+            lastCheckedAt: now,
+          },
+        });
+      }
+
+      if (statusRaw === 'Approved') replacement.approvedAt = now;
+      if (statusRaw === 'Verified') replacement.verifiedAt = now;
+      if (statusRaw === 'Completed') replacement.completedAt = now;
+      if (statusRaw === 'Rejected') replacement.rejectedAt = now;
+
+      await replacement.save();
+      return NextResponse.json(replacement);
+    }
+
+    const body = (await req.json()) as Record<string, unknown>;
+    const statusRaw = typeof body.status === 'string' ? body.status : '';
+    const noteRaw = typeof body.note === 'string' ? body.note : undefined;
+    const newToolId = typeof body.newToolId === 'string' ? body.newToolId : '';
+
+    if (statusRaw && !isReplacementStatus(statusRaw)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+
+    if (noteRaw !== undefined) replacement.note = noteRaw;
+
+    const status = statusRaw ? (statusRaw as ReplacementStatus) : undefined;
+    if (status) {
+      replacement.status = status;
+      if (status === 'Approved') replacement.approvedAt = now;
+      if (status === 'Verified') replacement.verifiedAt = now;
+      if (status === 'Completed') replacement.completedAt = now;
+      if (status === 'Rejected') replacement.rejectedAt = now;
+    }
+
+    if (newToolId) {
+      const newTool = await Tool.findOne({ _id: newToolId, status: true, isBorrowed: { $ne: true }, isReservedForReplacement: { $ne: true } });
+      if (!newTool) return NextResponse.json({ error: 'New tool unavailable' }, { status: 400 });
+      replacement.newToolId = newTool._id;
+      replacement.newToolCode = newTool.toolCode;
+      replacement.newToolName = newTool.name;
+    }
+
+    if (replacement.status === 'Approved') {
+      if (!replacement.newToolId) return NextResponse.json({ error: 'Pilih tools pengganti dulu' }, { status: 400 });
+      // Reserve new tool
+      await Tool.findByIdAndUpdate(replacement.newToolId, {
+        $set: { isReservedForReplacement: true, reservedReplacementId: replacement._id },
+      });
+    }
+
+    if (replacement.status === 'Shipped') {
+      if (!replacement.newToolId) return NextResponse.json({ error: 'newToolId required for Shipped' }, { status: 400 });
+      replacement.shippedAt = now;
+      await Tool.findByIdAndUpdate(replacement.newToolId, {
+        $set: {
+          isBorrowed: true,
+          currentBorrowerId: replacement.requesterId,
+          currentBorrowerName: replacement.requesterName,
+          isReservedForReplacement: false,
+          reservedReplacementId: null,
+        },
+      });
+    }
+
+    if (replacement.status === 'Rejected') {
+      if (replacement.newToolId) {
+        await Tool.findByIdAndUpdate(replacement.newToolId, {
+          $set: { isReservedForReplacement: false, reservedReplacementId: null },
+        });
+      }
+    }
+
+    if (replacement.status === 'Completed') {
+      // Ensure reservations cleared
+      if (replacement.newToolId) {
+        await Tool.findByIdAndUpdate(replacement.newToolId, {
+          $set: { isReservedForReplacement: false, reservedReplacementId: null },
+        });
+      }
+    }
+
+    await replacement.save();
+    return NextResponse.json(replacement);
+  } catch {
+    return NextResponse.json({ error: 'Failed to update replacement' }, { status: 500 });
+  }
+}
