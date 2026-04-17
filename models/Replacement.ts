@@ -18,11 +18,14 @@ export interface IReplacement {
   oldToolId: mongoose.Types.ObjectId;
   oldToolCode: string;
   oldToolName: string;
+  oldLoanId?: mongoose.Types.ObjectId;
+  oldSubCategory?: string;
   newToolId?: mongoose.Types.ObjectId;
   newToolCode?: string;
   newToolName?: string;
   status: ReplacementStatus;
   note?: string;
+  shippedPhotoUrl?: string;
   returnCondition?: 'Good' | 'Bad';
   returnDescription?: string;
   returnPhotoUrl?: string;
@@ -46,6 +49,8 @@ const ReplacementSchema = new Schema<IReplacement>(
     oldToolId: { type: Schema.Types.ObjectId, ref: 'Tool', required: true },
     oldToolCode: { type: String, required: true },
     oldToolName: { type: String, required: true },
+    oldLoanId: { type: Schema.Types.ObjectId, ref: 'Loan' },
+    oldSubCategory: { type: String },
     newToolId: { type: Schema.Types.ObjectId, ref: 'Tool' },
     newToolCode: { type: String },
     newToolName: { type: String },
@@ -55,6 +60,7 @@ const ReplacementSchema = new Schema<IReplacement>(
       default: 'Requested',
     },
     note: { type: String },
+    shippedPhotoUrl: { type: String },
     returnCondition: { type: String, enum: ['Good', 'Bad'] },
     returnDescription: { type: String },
     returnPhotoUrl: { type: String },

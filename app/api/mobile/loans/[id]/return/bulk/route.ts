@@ -5,6 +5,7 @@ import Tool from '@/models/Tool';
 import Report from '@/models/Report';
 import mongoose from 'mongoose';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
+import { sendReportEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 
@@ -53,13 +54,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const idx = loan.items.findIndex((it) => String(it.toolId) === itm.toolId);
       if (idx < 0) continue;
       if (loan.items[idx]?.returnedAt) continue;
+      const tool = toolsById.get(itm.toolId);
+      const isAlreadyBad = tool?.condition === 'Bad';
+      const finalCondition: 'Good' | 'Bad' = isAlreadyBad ? 'Bad' : itm.condition;
       loan.items[idx] = {
         ...loan.items[idx],
         returnedAt: now,
-        returnCondition: itm.condition,
-        returnDescription: itm.description || '',
+        returnCondition: finalCondition,
+        returnDescription: isAlreadyBad ? '' : itm.description || '',
+        status: 'Returned',
       };
-      const tool = toolsById.get(itm.toolId);
       if (tool) {
         await Tool.findByIdAndUpdate(tool._id, {
           $set: {
@@ -67,19 +71,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             currentBorrowerId: null,
             currentBorrowerName: null,
             currentLoanId: null,
-            condition: itm.condition,
+            condition: finalCondition,
+            status: finalCondition === 'Bad' ? false : tool.status,
             lastCheckedAt: now,
           },
         });
-        await Report.create({
-          toolId: tool._id,
-          toolCode: tool.toolCode,
-          toolName: tool.name,
-          technicianId: loan.borrowerId,
-          technicianName: loan.borrowerName,
-          condition: itm.condition,
-          description: itm.description || '',
-        });
+        if (!isAlreadyBad) {
+          const report = await Report.create({
+            toolId: tool._id,
+            toolCode: tool.toolCode,
+            toolName: tool.name,
+            category: tool.category,
+            subCategory: tool.subCategory,
+            technicianId: loan.borrowerId,
+            technicianName: loan.borrowerName,
+            examinerName: payload.name || 'Admin',
+            condition: finalCondition,
+            description: itm.description || '',
+          });
+          await sendReportEmail(report);
+        }
       }
     }
 
@@ -94,4 +105,3 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return mobileJson(req, { error: 'Failed bulk return', detail }, { status: 500 });
   }
 }
-

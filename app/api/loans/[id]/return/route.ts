@@ -7,6 +7,7 @@ import Loan from '@/models/Loan';
 import Tool from '@/models/Tool';
 import Report from '@/models/Report';
 import { readFormData } from '@/lib/formData';
+import { sendReportEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 
@@ -27,14 +28,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const description = formData.get('description');
     const file = formData.get('photo') as File | null;
 
-    if (typeof toolId !== 'string' || typeof condition !== 'string') {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+    if (typeof toolId !== 'string') return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     if (toolId === 'undefined' || toolId === 'null') {
       return NextResponse.json({ error: 'Invalid toolId' }, { status: 400 });
-    }
-    if (condition !== 'Good' && condition !== 'Bad') {
-      return NextResponse.json({ error: 'Invalid condition' }, { status: 400 });
     }
 
     const loan = await Loan.findById(id);
@@ -49,8 +45,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const tool = await Tool.findById(toolId);
     if (!tool) return NextResponse.json({ error: 'Tool not found' }, { status: 404 });
 
+    const isAlreadyBad = tool.condition === 'Bad';
+    const finalCondition = isAlreadyBad ? 'Bad' : condition;
+    if (!isAlreadyBad && finalCondition !== 'Good' && finalCondition !== 'Bad') {
+      return NextResponse.json({ error: 'Invalid condition' }, { status: 400 });
+    }
+
     let photoUrl = '';
-    if (file && file.size > 0 && file.name !== 'undefined') {
+    if (!isAlreadyBad && file && file.size > 0 && file.name !== 'undefined') {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       const filename = `return-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
@@ -64,9 +66,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     loan.items[itemIndex] = {
       ...loan.items[itemIndex],
       returnedAt: now,
-      returnCondition: condition,
-      returnDescription: typeof description === 'string' ? description : '',
-      returnPhotoUrl: photoUrl || undefined,
+      returnCondition: finalCondition as 'Good' | 'Bad',
+      returnDescription: isAlreadyBad ? '' : typeof description === 'string' ? description : '',
+      returnPhotoUrl: isAlreadyBad ? undefined : photoUrl || undefined,
+      status: 'Returned',
     };
 
     const remaining = loan.items.filter((it) => !it.returnedAt).length;
@@ -80,21 +83,28 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         currentBorrowerId: null,
         currentBorrowerName: null,
         currentLoanId: null,
-        condition,
+        condition: finalCondition,
+        status: finalCondition === 'Bad' ? false : tool.status,
         lastCheckedAt: now,
       },
     });
 
-    await Report.create({
-      toolId: tool._id,
-      toolCode: tool.toolCode,
-      toolName: tool.name,
-      technicianId: loan.borrowerId,
-      technicianName: loan.borrowerName,
-      condition,
-      description: typeof description === 'string' ? description : '',
-      photoUrl,
-    });
+    if (!isAlreadyBad) {
+      const report = await Report.create({
+        toolId: tool._id,
+        toolCode: tool.toolCode,
+        toolName: tool.name,
+        category: tool.category,
+        subCategory: tool.subCategory,
+        technicianId: loan.borrowerId,
+        technicianName: loan.borrowerName,
+        examinerName: session.user.name || 'Admin',
+        condition: finalCondition as 'Good' | 'Bad',
+        description: typeof description === 'string' ? description : '',
+        photoUrl,
+      });
+      await sendReportEmail(report);
+    }
 
     return NextResponse.json({ message: 'Returned', loan });
   } catch (error) {

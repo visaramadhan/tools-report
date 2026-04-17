@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { apiRequest } from '../../api/client';
 import { Replacement } from '../../types';
+import { useAppTheme } from '../../theme';
 
 type Props = {
   token: string;
@@ -11,6 +12,8 @@ type Props = {
 };
 
 export default function ReturnOldScreen({ token, replacement, onDone }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [condition, setCondition] = useState<'Good' | 'Bad'>('Bad');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -67,7 +70,7 @@ export default function ReturnOldScreen({ token, replacement, onDone }: Props) {
         </View>
 
         <Text style={[styles.label, { marginTop: 14 }]}>Keterangan Pengiriman</Text>
-        <TextInput value={description} onChangeText={setDescription} placeholder="Catatan..." style={[styles.input, { height: 90 }]} multiline />
+        <TextInput value={description} onChangeText={setDescription} placeholder="Catatan..." style={[styles.input, { height: 90 }]} multiline placeholderTextColor={colors.muted} />
 
         <Pressable style={styles.secondaryButton} onPress={pickPhoto}>
           <Text style={styles.secondaryText}>{photo ? 'Ganti Foto' : 'Pilih Foto'}</Text>
@@ -81,22 +84,22 @@ export default function ReturnOldScreen({ token, replacement, onDone }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA', padding: 16 },
-  title: { fontSize: 22, fontWeight: '800', color: '#2A3547', marginTop: 6, marginBottom: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, shadowColor: '#0A3E55', shadowOpacity: 0.1, shadowRadius: 12, elevation: 2 },
-  label: { fontWeight: '800', color: '#374151' },
-  value: { marginTop: 6, fontWeight: '800', color: '#111827' },
-  row: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  pill: { flex: 1, borderWidth: 1, borderColor: 'rgba(42,53,71,0.10)', borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
-  pillActive: { borderColor: 'rgba(14,94,126,0.45)', backgroundColor: 'rgba(14,94,126,0.06)' },
-  pillText: { color: '#374151', fontWeight: '800' },
-  pillTextActive: { color: '#0E5E7E' },
-  input: { marginTop: 8, borderWidth: 1, borderColor: 'rgba(42,53,71,0.12)', borderRadius: 12, padding: 12, textAlignVertical: 'top' },
-  secondaryButton: { marginTop: 12, borderWidth: 1, borderColor: 'rgba(42,53,71,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  secondaryText: { fontWeight: '800', color: '#0E5E7E' },
-  button: { marginTop: 14, backgroundColor: '#0E5E7E', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '800' },
-});
-
+const createStyles = (colors: { background: string; card: string; text: string; muted: string; border: string; inputBg: string; primary: string; danger: string }) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, padding: 16 },
+    title: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 6, marginBottom: 12 },
+    card: { backgroundColor: colors.card, borderRadius: 14, padding: 14, shadowColor: 'rgba(0,0,0,0.25)', shadowOpacity: 0.1, shadowRadius: 12, elevation: 2 },
+    label: { fontWeight: '800', color: colors.text },
+    value: { marginTop: 6, fontWeight: '800', color: colors.text },
+    row: { flexDirection: 'row', gap: 10, marginTop: 8 },
+    pill: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.card },
+    pillActive: { borderColor: colors.primary, backgroundColor: 'rgba(14,94,126,0.14)' },
+    pillText: { color: colors.text, fontWeight: '800' },
+    pillTextActive: { color: colors.primary },
+    input: { marginTop: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, textAlignVertical: 'top', backgroundColor: colors.inputBg, color: colors.text },
+    secondaryButton: { marginTop: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 11, alignItems: 'center', backgroundColor: colors.card },
+    secondaryText: { fontWeight: '800', color: colors.primary },
+    button: { marginTop: 14, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+    buttonDisabled: { opacity: 0.6 },
+    buttonText: { color: '#fff', fontWeight: '800' },
+  });

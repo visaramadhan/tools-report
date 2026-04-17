@@ -14,6 +14,8 @@ type LoanItem = {
     toolName: string;
     category: string;
     subCategory: string;
+    toolCondition?: 'Good' | 'Bad';
+    toolStatus?: boolean;
     returnedAt?: string;
   }>;
 };
@@ -39,8 +41,8 @@ export default function PengembalianPage() {
     async function fetchLoans() {
       setLoading(true);
       try {
-        const res = await fetch('/api/loans?status=Borrowed');
-        const res2 = await fetch('/api/loans?status=PartiallyReturned');
+        const res = await fetch('/api/loans?status=Borrowed&includeTools=true');
+        const res2 = await fetch('/api/loans?status=PartiallyReturned&includeTools=true');
         const list: LoanItem[] = [];
         if (res.ok) list.push(...((await res.json()) as LoanItem[]));
         if (res2.ok) list.push(...((await res2.json()) as LoanItem[]));
@@ -73,11 +75,15 @@ export default function PengembalianPage() {
     const state = forms[toolId] || { condition: 'Good', description: '' };
     setForm(toolId, { submitting: true });
     try {
+      const item = selectedLoan.items.find((it) => it.toolId === toolId);
+      const isAlreadyBad = item?.toolCondition === 'Bad';
       const fd = new FormData();
       fd.append('toolId', toolId);
-      fd.append('condition', state.condition);
-      fd.append('description', state.description || '');
-      if (state.file) fd.append('photo', state.file);
+      if (!isAlreadyBad) {
+        fd.append('condition', state.condition);
+        fd.append('description', state.description || '');
+        if (state.file) fd.append('photo', state.file);
+      }
 
       const res = await fetch(`/api/loans/${selectedLoan._id}/return`, {
         method: 'PUT',
@@ -93,8 +99,8 @@ export default function PengembalianPage() {
       alert('Pengembalian berhasil');
 
       const refreshed = await Promise.all([
-        fetch('/api/loans?status=Borrowed'),
-        fetch('/api/loans?status=PartiallyReturned'),
+        fetch('/api/loans?status=Borrowed&includeTools=true'),
+        fetch('/api/loans?status=PartiallyReturned&includeTools=true'),
       ]);
       const list: LoanItem[] = [];
       if (refreshed[0].ok) list.push(...((await refreshed[0].json()) as LoanItem[]));
@@ -117,11 +123,12 @@ export default function PengembalianPage() {
     setBulkSubmitting(true);
     try {
       const items = pending.map((it) => {
-        const state = forms[it.toolId] || { condition: 'Good', description: '' };
+        const isAlreadyBad = it.toolCondition === 'Bad';
+        const state = forms[it.toolId] || { condition: isAlreadyBad ? 'Bad' : 'Good', description: '' };
         return {
           toolId: it.toolId,
-          condition: state.condition,
-          description: state.description || '',
+          condition: isAlreadyBad ? 'Bad' : state.condition,
+          description: isAlreadyBad ? '' : state.description || '',
         };
       });
 
@@ -138,8 +145,8 @@ export default function PengembalianPage() {
 
       alert('Bulk pengembalian berhasil');
       const refreshed = await Promise.all([
-        fetch('/api/loans?status=Borrowed'),
-        fetch('/api/loans?status=PartiallyReturned'),
+        fetch('/api/loans?status=Borrowed&includeTools=true'),
+        fetch('/api/loans?status=PartiallyReturned&includeTools=true'),
       ]);
       const list: LoanItem[] = [];
       if (refreshed[0].ok) list.push(...((await refreshed[0].json()) as LoanItem[]));
@@ -205,6 +212,7 @@ export default function PengembalianPage() {
                   <tbody>
                     {selectedLoan.items.map((it) => {
                       const returned = !!it.returnedAt;
+                      const isAlreadyBad = it.toolCondition === 'Bad';
                       const state = forms[it.toolId] || { condition: 'Good', description: '' };
                       return (
                         <tr key={it.toolId} className="border-b border-gray-100">
@@ -221,29 +229,30 @@ export default function PengembalianPage() {
                           </td>
                           <td className="p-4">
                             <select
-                              value={state.condition}
+                              value={isAlreadyBad ? 'Bad' : state.condition}
                               onChange={(e) => setForm(it.toolId, { condition: e.target.value as 'Good' | 'Bad' })}
-                              disabled={returned}
+                              disabled={returned || isAlreadyBad}
                               className="w-40 border border-gray-200 rounded-lg p-2 bg-white disabled:bg-gray-50"
                             >
                               <option value="Good">Good</option>
                               <option value="Bad">Bad</option>
                             </select>
+                            {isAlreadyBad && <div className="text-xs text-gray-500 mt-1">Sudah dilaporkan rusak (skip input kondisi)</div>}
                           </td>
                           <td className="p-4">
                             <input
                               type="file"
                               accept="image/*"
-                              disabled={returned}
+                              disabled={returned || isAlreadyBad}
                               onChange={(e) => setForm(it.toolId, { file: e.target.files?.[0] })}
                               className="text-sm text-gray-600"
                             />
                           </td>
                           <td className="p-4">
                             <input
-                              value={state.description}
+                              value={isAlreadyBad ? '' : state.description}
                               onChange={(e) => setForm(it.toolId, { description: e.target.value })}
-                              disabled={returned}
+                              disabled={returned || isAlreadyBad}
                               placeholder="Catatan pengembalian..."
                               className="w-full border border-gray-200 rounded-lg p-2.5 disabled:bg-gray-50"
                             />

@@ -17,6 +17,8 @@ type FormState = {
   description: string;
   condition: 'Good' | 'Bad';
   status: boolean;
+  isSingleUse: boolean;
+  isSpecial: boolean;
 };
 
 export default function AdminToolFormScreen({ token, toolId, onDone }: Props) {
@@ -33,6 +35,8 @@ export default function AdminToolFormScreen({ token, toolId, onDone }: Props) {
     description: '',
     condition: 'Good',
     status: true,
+    isSingleUse: false,
+    isSpecial: false,
   });
 
   const title = useMemo(() => (isEdit ? 'Edit Tools' : 'Tambah Tools'), [isEdit]);
@@ -68,6 +72,8 @@ export default function AdminToolFormScreen({ token, toolId, onDone }: Props) {
       description: t.description || '',
       condition: (t.condition as 'Good' | 'Bad') || 'Good',
       status: t.status ?? true,
+      isSingleUse: t.isSingleUse ?? false,
+      isSpecial: t.isSpecial ?? false,
     });
   }, [token, toolId]);
 
@@ -119,6 +125,8 @@ export default function AdminToolFormScreen({ token, toolId, onDone }: Props) {
       fd.append('description', state.description);
       fd.append('condition', state.condition);
       fd.append('status', state.status ? 'true' : 'false');
+      fd.append('isSingleUse', state.isSingleUse ? 'true' : 'false');
+      fd.append('isSpecial', state.isSpecial ? 'true' : 'false');
       if (photo?.uri) {
         const name = photo.fileName || `tool-${Date.now()}.jpg`;
         const type = photo.mimeType || 'image/jpeg';
@@ -210,6 +218,26 @@ export default function AdminToolFormScreen({ token, toolId, onDone }: Props) {
           </Pressable>
         </View>
 
+        <Text style={styles.sectionLabel}>Tools Sekali Pakai</Text>
+        <View style={styles.row}>
+          <Pressable onPress={() => setState((p) => ({ ...p, isSingleUse: true }))} style={[styles.pillWide, state.isSingleUse && styles.pillActive]}>
+            <Text style={[styles.pillText, state.isSingleUse && styles.pillTextActive]}>Ya</Text>
+          </Pressable>
+          <Pressable onPress={() => setState((p) => ({ ...p, isSingleUse: false }))} style={[styles.pillWide, !state.isSingleUse && styles.pillActive]}>
+            <Text style={[styles.pillText, !state.isSingleUse && styles.pillTextActive]}>Tidak</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.sectionLabel}>Tools Spesial</Text>
+        <View style={styles.row}>
+          <Pressable onPress={() => setState((p) => ({ ...p, isSpecial: true }))} style={[styles.pillWide, state.isSpecial && styles.pillActive]}>
+            <Text style={[styles.pillText, state.isSpecial && styles.pillTextActive]}>Ya</Text>
+          </Pressable>
+          <Pressable onPress={() => setState((p) => ({ ...p, isSpecial: false }))} style={[styles.pillWide, !state.isSpecial && styles.pillActive]}>
+            <Text style={[styles.pillText, !state.isSpecial && styles.pillTextActive]}>Tidak</Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.label}>Deskripsi</Text>
         <TextInput value={state.description} onChangeText={(v) => setState((p) => ({ ...p, description: v }))} style={[styles.input, { height: 90 }]} multiline />
 
@@ -237,6 +265,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900', color: '#2A3547' },
   meta: { marginTop: 8, color: '#6b7280' },
   label: { marginTop: 12, fontWeight: '900', color: '#374151' },
+  sectionLabel: { marginTop: 16, fontWeight: '900', color: '#111827' },
   input: { marginTop: 8, borderWidth: 1, borderColor: 'rgba(42,53,71,0.12)', borderRadius: 12, padding: 12, backgroundColor: '#fff', textAlignVertical: 'top' },
   pills: { gap: 8, paddingVertical: 10 },
   pill: { borderWidth: 1, borderColor: 'rgba(42,53,71,0.10)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 10 },
@@ -253,4 +282,3 @@ const styles = StyleSheet.create({
   dangerButton: { borderWidth: 1, borderColor: 'rgba(239,68,68,0.45)', borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.06)' },
   dangerText: { color: '#ef4444', fontWeight: '900' },
 });
-

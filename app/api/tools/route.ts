@@ -27,6 +27,7 @@ export async function GET(req: Request) {
   }
   if (available === 'true') {
     query.status = true;
+    query.condition = { $ne: 'Bad' };
     query.isBorrowed = { $ne: true };
     query.isReservedForReplacement = { $ne: true };
   }

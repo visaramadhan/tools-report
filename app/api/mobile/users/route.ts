@@ -17,7 +17,15 @@ export async function GET(req: Request) {
     const payload = await verifyMobileToken(token);
     if (payload.role !== 'admin') return mobileJson(req, { error: 'Forbidden' }, { status: 403 });
     await dbConnect();
-    const users = await User.find({}, '-password').sort({ createdAt: -1 });
+    const { searchParams } = new URL(req.url);
+    const role = searchParams.get('role');
+    const status = searchParams.get('status');
+    const query: Record<string, unknown> = {};
+    if (role) query.role = role;
+    if (status === 'true') query.status = true;
+    if (status === 'false') query.status = false;
+
+    const users = await User.find(query, '-password').sort({ createdAt: -1 });
     return mobileJson(req, users);
   } catch {
     return mobileJson(req, { error: 'Unauthorized' }, { status: 401 });

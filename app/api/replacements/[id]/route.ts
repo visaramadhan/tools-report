@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import { auth } from '@/auth';
 import Replacement, { ReplacementStatus } from '@/models/Replacement';
 import Tool from '@/models/Tool';
+import Loan from '@/models/Loan';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { readFormData } from '@/lib/formData';
@@ -113,6 +114,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (status === 'Verified') replacement.verifiedAt = now;
       if (status === 'Completed') replacement.completedAt = now;
       if (status === 'Rejected') replacement.rejectedAt = now;
+      if (status === 'OldReturned') replacement.oldReturnedAt = now;
     }
 
     if (newToolId) {
@@ -151,6 +153,44 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           $set: { isReservedForReplacement: false, reservedReplacementId: null },
         });
       }
+    }
+
+    if (replacement.status === 'OldReturned') {
+      const tool = await Tool.findById(replacement.oldToolId);
+      const loanId = tool?.currentLoanId ? String(tool.currentLoanId) : '';
+
+      if (loanId) {
+        const loan = await Loan.findById(loanId);
+        if (loan) {
+          const idx = loan.items.findIndex((it) => String(it.toolId) === String(replacement.oldToolId));
+          if (idx >= 0 && !loan.items[idx]?.returnedAt) {
+            loan.items[idx] = {
+              ...loan.items[idx],
+              returnedAt: now,
+              returnCondition: 'Bad',
+              returnDescription: replacement.returnDescription || '',
+              returnPhotoUrl: replacement.returnPhotoUrl || undefined,
+              status: 'Returned',
+            };
+            const remaining = loan.items.filter((it) => !it.returnedAt).length;
+            loan.status = remaining === 0 ? 'Returned' : 'PartiallyReturned';
+            loan.returnedAt = remaining === 0 ? now : undefined;
+            await loan.save();
+          }
+        }
+      }
+
+      await Tool.findByIdAndUpdate(replacement.oldToolId, {
+        $set: {
+          isBorrowed: false,
+          currentBorrowerId: null,
+          currentBorrowerName: null,
+          currentLoanId: null,
+          condition: 'Bad',
+          status: false,
+          lastCheckedAt: now,
+        },
+      });
     }
 
     if (replacement.status === 'Completed') {

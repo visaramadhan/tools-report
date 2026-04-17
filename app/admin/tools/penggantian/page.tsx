@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { conditionPillClass } from '@/lib/utils';
 
 type ReportItem = {
   _id: string;
@@ -144,6 +145,26 @@ export default function PenggantianPage() {
       }
 
       setReturnFileDraft((p) => ({ ...p, [replacementId]: undefined }));
+      await refresh();
+    } finally {
+      setUpdating((p) => ({ ...p, [replacementId]: false }));
+    }
+  };
+
+  const quickVerifyReturn = async (replacementId: string) => {
+    setUpdating((p) => ({ ...p, [replacementId]: true }));
+    try {
+      if (!confirm('Verifikasi pengembalian tools rusak? Pastikan barang sudah diterima di kantor.')) return;
+      const res = await fetch(`/api/replacements/${replacementId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'OldReturned' }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        alert(json.error || 'Gagal verifikasi');
+        return;
+      }
       await refresh();
     } finally {
       setUpdating((p) => ({ ...p, [replacementId]: false }));
@@ -295,7 +316,9 @@ export default function PenggantianPage() {
                                   {(historyByReplacement[repl._id] || []).slice(0, 5).map((r) => (
                                     <div key={r._id} className="text-sm">
                                       <div className="text-gray-800 font-medium">
-                                        {new Date(r.createdAt).toLocaleString()} - {r.condition}
+                                        <span>{new Date(r.createdAt).toLocaleString()}</span>
+                                        <span className="mx-2">-</span>
+                                        <span className={conditionPillClass(r.condition)}>{r.condition}</span>
                                       </div>
                                       {r.description && <div className="text-gray-600">{r.description}</div>}
                                       {r.photoUrl && (
@@ -384,13 +407,24 @@ export default function PenggantianPage() {
                           </div>
                         )}
 
-                        <button
-                          onClick={() => updateReplacement(repl._id)}
-                          disabled={!!updating[repl._id]}
-                          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 shadow-sm transition-all w-full"
-                        >
-                          {updating[repl._id] ? 'Menyimpan...' : 'Update'}
-                        </button>
+                        <div className="flex gap-2">
+                          {repl.status === 'OldToolInTransit' && (
+                            <button
+                              onClick={() => quickVerifyReturn(repl._id)}
+                              disabled={!!updating[repl._id]}
+                              className="bg-success text-white px-4 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50 shadow-sm transition-all w-full"
+                            >
+                              {updating[repl._id] ? 'Proses...' : 'Verifikasi Pengembalian'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => updateReplacement(repl._id)}
+                            disabled={!!updating[repl._id]}
+                            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 shadow-sm transition-all w-full"
+                          >
+                            {updating[repl._id] ? 'Menyimpan...' : 'Update'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

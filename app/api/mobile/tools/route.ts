@@ -18,12 +18,14 @@ export async function GET(req: Request) {
   if (!token) return mobileJson(req, { error: 'Unauthorized' }, { status: 401 });
   try {
     const payload = await verifyMobileToken(token);
-    if (payload.role !== 'admin') return mobileJson(req, { error: 'Forbidden' }, { status: 403 });
-
     await dbConnect();
     const { searchParams } = new URL(req.url);
     const available = searchParams.get('available');
     const search = searchParams.get('search');
+
+    if (payload.role !== 'admin' && available !== 'true') {
+      return mobileJson(req, { error: 'Forbidden' }, { status: 403 });
+    }
 
     const query: any = {};
     if (search) {
@@ -35,7 +37,10 @@ export async function GET(req: Request) {
       query.isReservedForReplacement = { $ne: true };
     }
 
-    const tools = await Tool.find(query).sort({ createdDate: -1 }).limit(300);
+    const tools = await Tool.find(query)
+      .select('_id toolCode name category subCategory condition photoUrl description status year isSingleUse isSpecial isBorrowed currentBorrowerId currentBorrowerName currentLoanId')
+      .sort({ createdDate: -1 })
+      .limit(300);
     return mobileJson(req, tools);
   } catch {
     return mobileJson(req, { error: 'Unauthorized' }, { status: 401 });
@@ -57,6 +62,8 @@ export async function POST(req: Request) {
     const description = (formData.get('description') as string) || '';
     const condition = formData.get('condition') as 'Good' | 'Bad';
     const status = formData.get('status') === 'true';
+    const isSingleUse = formData.get('isSingleUse') === 'true';
+    const isSpecial = formData.get('isSpecial') === 'true';
     const file = formData.get('photo') as File | null;
 
     if (!categoryName || !subCategoryName || !year) {
@@ -93,6 +100,8 @@ export async function POST(req: Request) {
       condition,
       photoUrl,
       status,
+      isSingleUse,
+      isSpecial,
       lastCheckedAt: new Date(),
     });
 

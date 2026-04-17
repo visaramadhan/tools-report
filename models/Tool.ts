@@ -19,6 +19,8 @@ export interface ITool {
   currentLoanId?: mongoose.Types.ObjectId;
   isReservedForReplacement?: boolean;
   reservedReplacementId?: mongoose.Types.ObjectId;
+  isSingleUse?: boolean;
+  isSpecial?: boolean;
 }
 
 const ToolSchema = new Schema<ITool>({
@@ -40,6 +42,8 @@ const ToolSchema = new Schema<ITool>({
   currentLoanId: { type: Schema.Types.ObjectId, ref: 'Loan' },
   isReservedForReplacement: { type: Boolean, default: false },
   reservedReplacementId: { type: Schema.Types.ObjectId, ref: 'Replacement' },
+  isSingleUse: { type: Boolean, default: false },
+  isSpecial: { type: Boolean, default: false },
 });
 
 const Tool: Model<ITool> = mongoose.models.Tool || mongoose.model<ITool>('Tool', ToolSchema);

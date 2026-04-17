@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Loader2, Calendar } from 'lucide-react';
+import { conditionPillClass } from '@/lib/utils';
 
 export default function HistoryPage() {
   const { data: session } = useSession();
@@ -56,9 +57,7 @@ export default function HistoryPage() {
                     })}
                   </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  report.condition === 'Good' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                }`}>
+                <span className={conditionPillClass(report.condition)}>
                   {report.condition}
                 </span>
               </div>

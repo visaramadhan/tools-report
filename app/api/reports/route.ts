@@ -9,6 +9,8 @@ import { mkdir } from 'fs/promises';
 import path from 'path';
 import { sendReportEmail } from '@/lib/email';
 import { readFormData } from '@/lib/formData';
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -75,6 +77,12 @@ export async function POST(req: Request) {
     if (!tool) {
         return NextResponse.json({ error: 'Tool not found' }, { status: 404 });
     }
+    if (!tool.status || tool.condition === 'Bad') {
+      return NextResponse.json(
+        { error: 'Tools berstatus BAD / tidak aktif. Tidak bisa dibuat laporan lagi sebelum diperbaiki.' },
+        { status: 400 }
+      );
+    }
     if (!tool.isBorrowed || String(tool.currentBorrowerId || '') !== session.user.id) {
       return NextResponse.json({ error: 'Tool tidak sedang dipinjam oleh user ini' }, { status: 403 });
     }
@@ -90,7 +98,25 @@ export async function POST(req: Request) {
       const filepath = path.join(uploadDir, filename);
       
       await mkdir(uploadDir, { recursive: true });
-      await writeFile(filepath, buffer);
+      try {
+        await writeFile(filepath, buffer);
+      } catch {}
+
+      if (mongoose.connection.db) {
+        try {
+          const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+          await new Promise<void>((resolve, reject) => {
+            const stream = bucket.openUploadStream(filename, {
+              metadata: { contentType: file.type || 'application/octet-stream' },
+            });
+            stream.on('error', reject);
+            stream.on('finish', () => resolve());
+            stream.end(buffer);
+          });
+        } catch (e) {
+          console.warn('GridFS upload failed. Skipping.', e);
+        }
+      }
       photoUrl = `/uploads/${filename}`;
     }
 
@@ -98,14 +124,26 @@ export async function POST(req: Request) {
       toolId,
       toolCode: tool.toolCode,
       toolName: tool.name,
+      category: tool.category,
+      subCategory: tool.subCategory,
       technicianId: session.user.id,
       technicianName: session.user.name || 'Unknown',
       condition,
       description,
       photoUrl,
+      photoUrls: photoUrl ? [photoUrl] : [],
     });
+
+    await sendReportEmail(report);
     
     if (condition === 'Bad') {
+        await Tool.findByIdAndUpdate(tool._id, {
+          $set: {
+            condition: 'Bad',
+            status: false,
+            lastCheckedAt: new Date(),
+          },
+        });
         const existing = await Replacement.findOne({ reportId: report._id });
         if (!existing) {
           const replacement = await Replacement.create({
@@ -119,13 +157,12 @@ export async function POST(req: Request) {
           });
           await Report.findByIdAndUpdate(report._id, { $set: { replacementId: replacement._id } });
         }
-        // Send email
-        await sendReportEmail(report);
     }
 
     return NextResponse.json(report, { status: 201 });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'Failed to create report' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Failed to create report', detail }, { status: 500 });
   }
 }

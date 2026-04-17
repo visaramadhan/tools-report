@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -19,10 +20,12 @@
 
 # production
 /build
+**/dist/
 
 # misc
 .DS_Store
 *.pem
+.vscode/
 
 # debug
 npm-debug.log*
@@ -35,6 +38,20 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# expo/react-native
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/android/.gradle/
+mobile/android/app/.cxx/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+mobile/ios/
+
+# uploads (generated)
+public/uploads/
 
 # typescript
 *.tsbuildinfo

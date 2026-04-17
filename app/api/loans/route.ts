@@ -17,14 +17,40 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
   const borrowerId = searchParams.get('borrowerId');
+  const includeTools = searchParams.get('includeTools') === 'true';
 
   const query: Record<string, unknown> = {};
   if (status) query.status = status;
   if (borrowerId) query.borrowerId = borrowerId;
 
   try {
-    const loans = await Loan.find(query).sort({ borrowedAt: -1 }).limit(200);
-    return NextResponse.json(loans);
+    const loans = await Loan.find(query).sort({ borrowedAt: -1 }).limit(200).lean();
+    if (!includeTools) return NextResponse.json(loans);
+
+    const toolIds = Array.from(
+      new Set(
+        loans
+          .flatMap((l: any) => l.items || [])
+          .map((it: any) => String(it.toolId))
+          .filter(Boolean)
+      )
+    );
+    const tools = await Tool.find({ _id: { $in: toolIds } }).select({ _id: 1, condition: 1, status: 1 }).lean();
+    const toolsById = new Map(tools.map((t: any) => [String(t._id), t]));
+
+    const enhanced = loans.map((l: any) => ({
+      ...l,
+      items: (l.items || []).map((it: any) => {
+        const t = toolsById.get(String(it.toolId));
+        return {
+          ...it,
+          toolCondition: t?.condition,
+          toolStatus: t?.status,
+        };
+      }),
+    }));
+
+    return NextResponse.json(enhanced);
   } catch {
     return NextResponse.json({ error: 'Failed to fetch loans' }, { status: 500 });
   }
@@ -54,7 +80,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const tools = await Tool.find({ _id: { $in: normalizedToolIds }, status: true, isBorrowed: { $ne: true } });
+    const tools = await Tool.find({
+      _id: { $in: normalizedToolIds },
+      status: true,
+      condition: { $ne: 'Bad' },
+      isBorrowed: { $ne: true },
+      isReservedForReplacement: { $ne: true },
+    });
     if (tools.length !== normalizedToolIds.length) {
       return NextResponse.json({ error: 'Some tools are unavailable' }, { status: 400 });
     }
@@ -97,4 +129,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to create loan' }, { status: 500 });
   }
 }
-

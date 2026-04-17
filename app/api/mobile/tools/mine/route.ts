@@ -2,6 +2,7 @@ import dbConnect from '@/lib/mongodb';
 import Tool from '@/models/Tool';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
+import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
 
@@ -16,9 +17,8 @@ export async function GET(req: Request) {
 
     await dbConnect();
     const tools = await Tool.find({
-      status: true,
       isBorrowed: true,
-      currentBorrowerId: payload.sub,
+      currentBorrowerId: new mongoose.Types.ObjectId(payload.sub),
     }).sort({ createdDate: -1 });
 
     return mobileJson(req, tools);

@@ -25,11 +25,12 @@ Gunakan EAS Build supaya dapat file APK yang bisa langsung di-install di Android
 npx eas-cli@latest login
 ```
 
-2. Set API URL untuk device (ganti `YOUR_SERVER_IP`):
-   - Di [eas.json](file:///C:/Users/Visa%20Ramadhan/Documents/project/tools-report/mobile/eas.json) bagian `build.preview.env.EXPO_PUBLIC_API_URL`
-   - Untuk HP fisik, jangan pakai `localhost`. Contoh: `http://192.168.1.10:3001`
+2. Set API URL:
+   - Kalau pakai Vercel (online): `https://tools-report.vercel.app`
+   - Kalau pakai laptop (LAN): `http://192.168.1.10:3001`
+   - Set di [eas.json](file:///C:/Users/Visa%20Ramadhan/Documents/project/tools-report/mobile/eas.json) bagian `build.preview.env.EXPO_PUBLIC_API_URL`
 
-3. Jalankan backend agar bisa diakses dari HP (LAN):
+3. (Opsional) Jalankan backend lokal agar bisa diakses dari HP (LAN):
 
 ```bash
 npm run dev
