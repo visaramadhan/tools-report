@@ -24,7 +24,12 @@ export default function ReportsPage() {
   const [filterSubCategory, setFilterSubCategory] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailReport, setDetailReport] = useState<any>(null);
-  const [settings, setSettings] = useState<{ companyName?: string; logoUrl?: string } | null>(null);
+  const [settings, setSettings] = useState<{
+    companyName?: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    footerText?: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchReports();
