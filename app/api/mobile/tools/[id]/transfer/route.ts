@@ -5,8 +5,7 @@ import User from '@/models/User';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
 import { sendSystemEmail } from '@/lib/email';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
@@ -45,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!toTechnicianId) return mobileJson(req, { error: 'Peminjam baru wajib dipilih' }, { status: 400 });
     if (condition !== 'Good' && condition !== 'Bad') return mobileJson(req, { error: 'Kondisi tidak valid' }, { status: 400 });
     if (!note.trim()) return mobileJson(req, { error: 'Keterangan/No. Resi wajib diisi' }, { status: 400 });
-    if (!file || !(file instanceof File) || file.size === 0 || file.name === 'undefined') {
+    if (!file || typeof (file as any).arrayBuffer !== 'function' || typeof (file as any).size !== 'number' || (file as any).size === 0 || (file as any).name === 'undefined') {
       return mobileJson(req, { error: 'Foto terakhir wajib diupload' }, { status: 400 });
     }
 
@@ -64,13 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return mobileJson(req, { error: 'Tools sedang dalam proses transfer' }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filename = `transfer-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-    await writeFile(path.join(uploadDir, filename), buffer);
-    const photoUrl = `/uploads/${filename}`;
+    const { url: photoUrl } = await uploadFileToGridFs(file, 'transfer');
 
     const fromLoanId = tool.currentLoanId ? new mongoose.Types.ObjectId(String(tool.currentLoanId)) : undefined;
 

@@ -4,8 +4,7 @@ import SubCategory from '@/models/SubCategory';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
 import { readFormData } from '@/lib/formData';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -80,13 +79,8 @@ export async function POST(req: Request) {
 
     let photoUrl = '';
     if (file && file.size > 0 && file.name !== 'undefined') {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const filename = `tool-${Date.now()}-${file.name.replace(/\\s/g, '_')}`;
-      const uploadDir = path.join(process.cwd(), 'public/uploads');
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, filename), buffer);
-      photoUrl = `/uploads/${filename}`;
+      const uploaded = await uploadFileToGridFs(file, 'tool');
+      photoUrl = uploaded.url;
     }
 
     const tool = await Tool.create({

@@ -3,8 +3,7 @@ import Loan from '@/models/Loan';
 import Tool from '@/models/Tool';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -37,13 +36,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return mobileJson(req, { error: 'Foto penerimaan wajib diupload' }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filename = `receive-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-    await writeFile(path.join(uploadDir, filename), buffer);
-    const photoUrl = `/uploads/${filename}`;
+    const { url: photoUrl } = await uploadFileToGridFs(file, 'receive');
 
     const now = new Date();
     item.returnedAt = now;
@@ -78,4 +71,3 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return mobileJson(req, { error: 'Failed to verify return', detail }, { status: 500 });
   }
 }
-

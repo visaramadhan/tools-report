@@ -1,6 +1,4 @@
 import dbConnect from '@/lib/mongodb';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
 import Report from '@/models/Report';
 import Tool from '@/models/Tool';
 import Replacement from '@/models/Replacement';
@@ -9,8 +7,7 @@ import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { sendReportEmail } from '@/lib/email';
 import { sendSystemEmail } from '@/lib/email';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
-import mongoose from 'mongoose';
-import { GridFSBucket } from 'mongodb';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -85,39 +82,10 @@ export async function POST(req: Request) {
     }
 
     const photoUrls: string[] = [];
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    await mkdir(uploadDir, { recursive: true });
-    let bucket: GridFSBucket | null = null;
-    try {
-      bucket = mongoose.connection.db ? new GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' }) : null;
-    } catch {
-      bucket = null;
-    }
-
     for (const file of files) {
       if (file && file.size > 0 && file.name !== 'undefined') {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-        try {
-          await writeFile(path.join(uploadDir, filename), buffer);
-        } catch {}
-
-        if (bucket) {
-          try {
-            await new Promise<void>((resolve, reject) => {
-              const stream = bucket.openUploadStream(filename, {
-                metadata: { contentType: file.type || 'application/octet-stream' },
-              });
-              stream.on('error', reject);
-              stream.on('finish', () => resolve());
-              stream.end(buffer);
-            });
-          } catch (e) {
-            console.warn('GridFS upload failed. Skipping.', e);
-          }
-        }
-        photoUrls.push(`/uploads/${filename}`);
+        const uploaded = await uploadFileToGridFs(file, 'report');
+        photoUrls.push(uploaded.url);
       }
     }
 

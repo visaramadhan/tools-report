@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Tool from '@/models/Tool';
 import { auth } from '@/auth';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
 import { readFormData } from '@/lib/formData';
 import { sendSystemEmail } from '@/lib/email';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -50,15 +49,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const file = formData.get('photo') as File | null;
       
       if (file && file.size > 0) {
-          const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
-          
-          const filename = `tool-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-          const uploadDir = path.join(process.cwd(), 'public/uploads');
-          const filepath = path.join(uploadDir, filename);
-          await mkdir(uploadDir, { recursive: true });
-          await writeFile(filepath, buffer);
-          updateData.photoUrl = `/uploads/${filename}`;
+          const uploaded = await uploadFileToGridFs(file, 'tool');
+          updateData.photoUrl = uploaded.url;
       }
       
       // If condition changed, update lastCheckedAt

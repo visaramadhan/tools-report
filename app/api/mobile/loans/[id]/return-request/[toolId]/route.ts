@@ -3,8 +3,7 @@ import Loan from '@/models/Loan';
 import Tool from '@/models/Tool';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -46,13 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const item = (loan.items || []).find((it: any) => String(it.toolId) === String(toolId) && !it.returnedAt);
     if (!item) return mobileJson(req, { error: 'Loan item tidak ditemukan / sudah dikembalikan' }, { status: 404 });
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filename = `return-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-    await writeFile(path.join(uploadDir, filename), buffer);
-    const photoUrl = `/uploads/${filename}`;
+    const { url: photoUrl } = await uploadFileToGridFs(file, 'return');
 
     const now = new Date();
     item.status = 'Returning';

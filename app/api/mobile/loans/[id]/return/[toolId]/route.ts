@@ -5,8 +5,7 @@ import Report from '@/models/Report';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
 import { sendReportEmail } from '@/lib/email';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -45,13 +44,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     let photoUrl = '';
     if (!isAlreadyBad && photo && photo.size > 0 && photo.name !== 'undefined') {
-      const uploadDir = path.join(process.cwd(), 'public/uploads');
-      await mkdir(uploadDir, { recursive: true });
-      const bytes = await photo.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const filename = `return-${Date.now()}-${photo.name.replace(/\s/g, '_')}`;
-      await writeFile(path.join(uploadDir, filename), buffer);
-      photoUrl = `/uploads/${filename}`;
+      const uploaded = await uploadFileToGridFs(photo, 'return');
+      photoUrl = uploaded.url;
     }
 
     item.returnedAt = new Date();

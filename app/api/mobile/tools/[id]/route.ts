@@ -4,8 +4,7 @@ import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
 import { sendSystemEmail } from '@/lib/email';
 import { readFormData } from '@/lib/formData';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -66,13 +65,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (typeof isSpecial === 'string') updateData.isSpecial = isSpecial === 'true';
 
       if (file && file.size > 0 && file.name !== 'undefined') {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const filename = `tool-${Date.now()}-${file.name.replace(/\\s/g, '_')}`;
-        const uploadDir = path.join(process.cwd(), 'public/uploads');
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        updateData.photoUrl = `/uploads/${filename}`;
+        const uploaded = await uploadFileToGridFs(file, 'tool');
+        updateData.photoUrl = uploaded.url;
       }
 
       if (typeof updateData.condition === 'string' && currentTool.condition !== updateData.condition) {

@@ -3,8 +3,7 @@ import Loan from '@/models/Loan';
 import Tool from '@/models/Tool';
 import { getBearerToken, verifyMobileToken } from '@/lib/mobileAuth';
 import { mobileJson, mobileOptions } from '@/lib/mobileCors';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -56,13 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return mobileJson(req, { error: 'Tool pengganti harus dari sub kategori yang sama' }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filename = `ship-${Date.now()}-${file.name.replace(/\\s/g, '_')}`;
-    await writeFile(path.join(uploadDir, filename), buffer);
-    const photoUrl = `/uploads/${filename}`;
+    const { url: photoUrl } = await uploadFileToGridFs(file, 'ship');
 
     const now = new Date();
     const newItem: any = {
@@ -95,4 +88,3 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return mobileJson(req, { error: 'Failed to exchange tool', detail }, { status: 500 });
   }
 }
-

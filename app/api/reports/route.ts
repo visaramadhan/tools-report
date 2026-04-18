@@ -4,13 +4,9 @@ import Report from '@/models/Report';
 import Tool from '@/models/Tool';
 import { auth } from '@/auth';
 import Replacement from '@/models/Replacement';
-import { writeFile } from 'fs/promises';
-import { mkdir } from 'fs/promises';
-import path from 'path';
 import { sendReportEmail } from '@/lib/email';
 import { readFormData } from '@/lib/formData';
-import mongoose from 'mongoose';
-import { GridFSBucket } from 'mongodb';
+import { uploadFileToGridFs } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -91,35 +87,8 @@ export async function POST(req: Request) {
 
     let photoUrl = '';
     if (file && file.size > 0 && file.name !== 'undefined') {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Create unique filename
-      const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-      const uploadDir = path.join(process.cwd(), 'public/uploads');
-      const filepath = path.join(uploadDir, filename);
-      
-      await mkdir(uploadDir, { recursive: true });
-      try {
-        await writeFile(filepath, buffer);
-      } catch {}
-
-      if (mongoose.connection.db) {
-        try {
-          const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
-          await new Promise<void>((resolve, reject) => {
-            const stream = bucket.openUploadStream(filename, {
-              metadata: { contentType: file.type || 'application/octet-stream' },
-            });
-            stream.on('error', reject);
-            stream.on('finish', () => resolve());
-            stream.end(buffer);
-          });
-        } catch (e) {
-          console.warn('GridFS upload failed. Skipping.', e);
-        }
-      }
-      photoUrl = `/uploads/${filename}`;
+      const uploaded = await uploadFileToGridFs(file, 'report');
+      photoUrl = uploaded.url;
     }
 
     const report = await Report.create({
