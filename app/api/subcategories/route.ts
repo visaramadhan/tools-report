@@ -4,6 +4,8 @@ import SubCategory from '@/models/SubCategory';
 import Category from '@/models/Category';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   await dbConnect();
   const { searchParams } = new URL(req.url);

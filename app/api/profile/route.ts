@@ -4,6 +4,8 @@ import User from '@/models/User';
 import { auth } from '@/auth';
 import bcrypt from 'bcryptjs';
 
+export const runtime = 'nodejs';
+
 export async function PUT(req: Request) {
   const session = await auth();
   if (!session || !session.user) {

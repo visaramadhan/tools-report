@@ -3,6 +3,8 @@ import dbConnect from '@/lib/mongodb';
 import Setting from '@/models/Setting';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   await dbConnect();
   try {

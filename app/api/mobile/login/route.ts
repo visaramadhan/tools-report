@@ -21,8 +21,15 @@ export async function POST(req: Request) {
     }
 
     const user = await User.findOne({ email });
-    if (!user || user.status === false) {
+    if (!user) {
+      const totalUsers = await User.countDocuments();
+      if (totalUsers === 0) {
+        return mobileJson(req, { error: 'Belum ada user. Jalankan /api/seed untuk membuat admin pertama.', detail: { needSeed: true } }, { status: 409 });
+      }
       return mobileJson(req, { error: 'Invalid credentials' }, { status: 401 });
+    }
+    if (user.status === false) {
+      return mobileJson(req, { error: 'Akun nonaktif' }, { status: 403 });
     }
     if (!user.password) {
       return mobileJson(req, { error: 'Invalid credentials' }, { status: 401 });

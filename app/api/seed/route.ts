@@ -5,12 +5,20 @@ import bcrypt from 'bcryptjs';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const key = searchParams.get('key') || '';
+    const expectedKey = process.env.SEED_KEY || '';
+    if (!expectedKey || key !== expectedKey) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     await dbConnect();
 
-    const adminEmail = 'admin@example.com';
-    const adminPassword = 'admin123';
+    const adminEmail = (process.env.SEED_ADMIN_EMAIL || 'admin@example.com').toLowerCase().trim();
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'admin123';
+    const adminName = process.env.SEED_ADMIN_NAME || 'Admin User';
 
     const adminExists = await User.findOne({ email: adminEmail });
     if (adminExists) {
@@ -19,7 +27,7 @@ export async function GET() {
 
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     await User.create({
-      name: 'Admin User',
+      name: adminName,
       email: adminEmail,
       password: hashedPassword,
       role: 'admin',

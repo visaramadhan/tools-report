@@ -12,6 +12,8 @@ import { readFormData } from '@/lib/formData';
 import mongoose from 'mongoose';
 import { GridFSBucket } from 'mongodb';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   const session = await auth();
   if (!session) {

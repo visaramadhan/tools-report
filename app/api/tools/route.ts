@@ -7,6 +7,8 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { readFormData } from '@/lib/formData';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   await dbConnect();
   

@@ -7,6 +7,8 @@ import path from 'path';
 import { readFormData } from '@/lib/formData';
 import { sendSystemEmail } from '@/lib/email';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await dbConnect();
   try {

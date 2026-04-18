@@ -4,6 +4,8 @@ import Tool from '@/models/Tool';
 import Report from '@/models/Report';
 import { auth } from '@/auth';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   const session = await auth();
   if (!session || session.user.role !== 'admin') {
