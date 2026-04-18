@@ -140,9 +140,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       photoUrl,
       photoUrls: [photoUrl],
     });
-    await sendReportEmail(report);
+    sendReportEmail(report).catch(() => undefined);
 
-    const emailStatus = await sendSystemEmail({
+    sendSystemEmail({
       subject: `[TRANSFER] Accepted - ${tool.toolCode || ''} ${tool.name || ''}`.trim(),
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
@@ -157,9 +157,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           <div style="margin-top: 22px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">Notifikasi otomatis sistem</div>
         </div>
       `,
-    });
+    }).catch(() => undefined);
 
-    return mobileJson(req, { ok: true, emailStatus });
+    return mobileJson(req, { ok: true });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Unknown error';
     return mobileJson(req, { error: 'Failed to accept transfer', detail }, { status: 500 });

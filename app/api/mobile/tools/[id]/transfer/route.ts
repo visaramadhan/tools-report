@@ -91,7 +91,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3001';
     const fullPhotoUrl = photoUrl ? `${baseUrl}${photoUrl}` : '';
-    const emailStatus = await sendSystemEmail({
+    sendSystemEmail({
       subject: `[TRANSFER] Pending - ${tool.toolCode || ''} ${tool.name || ''}`.trim(),
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
@@ -107,9 +107,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           <div style="margin-top: 22px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">Notifikasi otomatis sistem</div>
         </div>
       `,
-    });
+    }).catch(() => undefined);
 
-    return mobileJson(req, { transferId: String(transfer._id), emailStatus });
+    return mobileJson(req, { transferId: String(transfer._id) });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Unknown error';
     return mobileJson(req, { error: 'Failed to transfer tool', detail }, { status: 500 });
